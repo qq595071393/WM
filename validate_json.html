@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JSON语法验证工具</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+        .success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .info { background: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+        .loading { background: #fff3cd; color: #856404; border: 1px solid #ffeaa7; }
+        .warning { background: #fff3cd; color: #856404; border: 1px solid #ffeaa7; }
+        pre {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        .file-input {
+            margin: 10px 0;
+        }
+        .progress {
+            width: 100%;
+            height: 20px;
+            background: #e9ecef;
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+        .progress-bar {
+            height: 100%;
+            background: #007bff;
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+        .error-details {
+            background: #f8d9da;
+            border: 1px solid #f5c6cb;
+            border-radius: 4px;
+            padding: 10px;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>JSON语法验证工具</h1>
+        <p>这个工具可以帮助你检查word_database.json文件的语法是否正确。</p>
+        
+        <div class="file-input">
+            <label for="jsonFile">选择JSON文件：</label>
+            <input type="file" id="jsonFile" accept=".json" />
+        </div>
+        
+        <button onclick="validateLocalFile()">验证本地文件</button>
+        <button onclick="validateOnlineFile()">验证在线文件</button>
+        <button onclick="checkFileStructure()">检查文件结构</button>
+        
+        <div class="progress" id="progressBar" style="display: none;">
+            <div class="progress-bar" id="progressBarFill"></div>
+        </div>
+        
+        <div id="results"></div>
+    </div>
+
+    <script>
+        function addResult(message, type = 'info') {
+            const results = document.getElementById('results');
+            const div = document.createElement('div');
+            div.className = `status ${type}`;
+            div.innerHTML = message;
+            results.appendChild(div);
+        }
+
+        function showProgress(percent) {
+            const progressBar = document.getElementById('progressBar');
+            const progressBarFill = document.getElementById('progressBarFill');
+            progressBar.style.display = 'block';
+            progressBarFill.style.width = percent + '%';
+        }
+
+        function hideProgress() {
+            document.getElementById('progressBar').style.display = 'none';
+        }
+
+        function validateLocalFile() {
+            const fileInput = document.getElementById('jsonFile');
+            const file = fileInput.files[0];
+            
+            if (!file) {
+                addResult('请先选择JSON文件', 'error');
+                return;
+            }
+
+            addResult(`正在验证文件: ${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)`, 'loading');
+            showProgress(10);
+
+            const reader = new FileReader();
+            
+            reader.onload = function(e) {
+                showProgress(50);
+                addResult('文件读取完成，正在解析JSON...', 'info');
+                
+                try {
+                    const startTime = Date.now();
+                    const jsonData = JSON.parse(e.target.result);
+                    const endTime = Date.now();
+                    const parseTime = endTime - startTime;
+                    
+                    showProgress(100);
+                    addResult(`✅ JSON语法验证成功！`, 'success');
+                    addResult(`解析时间: ${parseTime}ms`, 'info');
+                    
+                    // 检查数据结构
+                    const wordCount = Object.keys(jsonData).length;
+                    addResult(`单词数量: ${wordCount}`, 'success');
+                    
+                    // 检查前几个单词的结构
+                    const sampleWords = Object.keys(jsonData).slice(0, 3);
+                    addResult(`示例单词: ${sampleWords.join(', ')}`, 'info');
+                    
+                    // 验证单词结构
+                    let validStructure = true;
+                    let invalidWords = [];
+                    
+                    for (let word of sampleWords) {
+                        const wordData = jsonData[word];
+                        if (!wordData.phonetic || !wordData.definition || !wordData.tags) {
+                            validStructure = false;
+                            invalidWords.push(word);
+                        }
+                    }
+                    
+                    if (validStructure) {
+                        addResult('✅ 单词数据结构正确', 'success');
+                        addResult(`示例结构:`, 'info');
+                        addResult(`<pre>${JSON.stringify(jsonData[sampleWords[0]], null, 2)}</pre>`, 'info');
+                    } else {
+                        addResult(`⚠️ 部分单词结构不正确: ${invalidWords.join(', ')}`, 'warning');
+                    }
+                    
+                } catch (error) {
+                    showProgress(100);
+                    addResult(`❌ JSON语法错误: ${error.message}`, 'error');
+                    
+                    // 尝试定位错误位置
+                    const errorMessage = error.message;
+                    if (errorMessage.includes('position')) {
+                        const match = errorMessage.match(/position (\d+)/);
+                        if (match) {
+                            const position = parseInt(match[1]);
+                            const text = e.target.result;
+                            const line = text.substring(0, position).split('\n').length;
+                            const column = position - text.substring(0, position).lastIndexOf('\n') - 1;
+                            addResult(`错误位置: 第${line}行，第${column}列`, 'error');
+                            
+                            // 显示错误附近的代码
+                            const start = Math.max(0, position - 100);
+                            const end = Math.min(text.length, position + 100);
+                            const context = text.substring(start, end);
+                            addResult(`错误上下文:`, 'error');
+                            addResult(`<pre>${context}</pre>`, 'error');
+                        }
+                    }
+                }
+                
+                hideProgress();
+            };
+            
+            reader.onerror = function() {
+                hideProgress();
+                addResult('❌ 文件读取失败', 'error');
+            };
+            
+            reader.readAsText(file);
+        }
+
+        function validateOnlineFile() {
+            addResult('正在验证在线JSON文件...', 'loading');
+            showProgress(10);
+            
+            const startTime = Date.now();
+            fetch('./word_database.json')
+                .then(response => {
+                    showProgress(30);
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+                    return response.text();
+                })
+                .then(text => {
+                    showProgress(60);
+                    addResult('文件下载完成，正在解析JSON...', 'info');
+                    
+                    try {
+                        const jsonData = JSON.parse(text);
+                        const endTime = Date.now();
+                        const totalTime = endTime - startTime;
+                        
+                        showProgress(100);
+                        addResult(`✅ 在线JSON文件验证成功！`, 'success');
+                        addResult(`总耗时: ${totalTime}ms`, 'info');
+                        
+                        const wordCount = Object.keys(jsonData).length;
+                        addResult(`单词数量: ${wordCount}`, 'success');
+                        
+                    } catch (error) {
+                        showProgress(100);
+                        addResult(`❌ 在线JSON文件语法错误: ${error.message}`, 'error');
+                        
+                        // 尝试定位错误
+                        const errorMessage = error.message;
+                        if (errorMessage.includes('position')) {
+                            const match = errorMessage.match(/position (\d+)/);
+                            if (match) {
+                                const position = parseInt(match[1]);
+                                const line = text.substring(0, position).split('\n').length;
+                                const column = position - text.substring(0, position).lastIndexOf('\n') - 1;
+                                addResult(`错误位置: 第${line}行，第${column}列`, 'error');
+                            }
+                        }
+                    }
+                    
+                    hideProgress();
+                })
+                .catch(error => {
+                    hideProgress();
+                    addResult(`❌ 在线文件验证失败: ${error.message}`, 'error');
+                });
+        }
+
+        function checkFileStructure() {
+            addResult('正在检查文件结构...', 'loading');
+            
+            fetch('./word_database.json')
+                .then(response => response.text())
+                .then(text => {
+                    // 检查基本结构
+                    const lines = text.split('\n');
+                    addResult(`文件总行数: ${lines.length}`, 'info');
+                    
+                    // 检查是否以 { 开始
+                    if (!text.trim().startsWith('{')) {
+                        addResult('❌ 文件不是以 { 开始', 'error');
+                        return;
+                    }
+                    
+                    // 检查是否以 } 结束
+                    if (!text.trim().endsWith('}')) {
+                        addResult('❌ 文件不是以 } 结束', 'error');
+                        return;
+                    }
+                    
+                    // 检查引号匹配
+                    const openQuotes = (text.match(/"/g) || []).length;
+                    if (openQuotes % 2 !== 0) {
+                        addResult('❌ 引号数量不匹配', 'error');
+                        return;
+                    }
+                    
+                    // 检查括号匹配
+                    const openBraces = (text.match(/{/g) || []).length;
+                    const closeBraces = (text.match(/}/g) || []).length;
+                    if (openBraces !== closeBraces) {
+                        addResult(`❌ 括号不匹配: 开括号${openBraces}个，闭括号${closeBraces}个`, 'error');
+                        return;
+                    }
+                    
+                    // 检查方括号匹配
+                    const openBrackets = (text.match(/\[/g) || []).length;
+                    const closeBrackets = (text.match(/\]/g) || []).length;
+                    if (openBrackets !== closeBrackets) {
+                        addResult(`❌ 方括号不匹配: 开方括号${openBrackets}个，闭方括号${closeBrackets}个`, 'error');
+                        return;
+                    }
+                    
+                    addResult('✅ 基本文件结构检查通过', 'success');
+                    
+                    // 尝试解析前1000个字符
+                    try {
+                        const sample = text.substring(0, 1000);
+                        JSON.parse(sample + '}'); // 临时添加结束括号
+                        addResult('✅ 文件开头部分语法正确', 'success');
+                    } catch (error) {
+                        addResult(`❌ 文件开头部分有语法错误: ${error.message}`, 'error');
+                    }
+                })
+                .catch(error => {
+                    addResult(`❌ 文件结构检查失败: ${error.message}`, 'error');
+                });
+        }
+
+        // 页面加载时自动检查
+        window.addEventListener('load', () => {
+            addResult('JSON语法验证工具已准备就绪', 'info');
+            addResult('请选择验证方式：', 'info');
+            addResult('1. 选择本地文件进行验证（推荐）', 'info');
+            addResult('2. 验证在线文件（如果已部署到GitHub）', 'info');
+        });
+    </script>
+</body>
+</html>

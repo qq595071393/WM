@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JSONL解析测试</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .result { margin: 10px 0; padding: 10px; border-radius: 4px; }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+        .info { background: #d1ecf1; color: #0c5460; }
+    </style>
+</head>
+<body>
+    <h1>JSONL解析测试</h1>
+    <div id="results"></div>
+
+    <script>
+        function addResult(message, type = 'info') {
+            const results = document.getElementById('results');
+            const div = document.createElement('div');
+            div.className = `result ${type}`;
+            div.innerHTML = message;
+            results.appendChild(div);
+        }
+
+        // 测试JSONL解析
+        fetch('./word_database.json')
+            .then(response => response.text())
+            .then(text => {
+                addResult('开始解析JSONL格式文件...', 'info');
+                
+                const lines = text.trim().split('\n');
+                const wordDatabase = {};
+                let successCount = 0;
+                let errorCount = 0;
+                
+                for (let i = 0; i < lines.length; i++) {
+                    const line = lines[i].trim();
+                    if (!line) continue;
+                    
+                    try {
+                        const wordData = JSON.parse(line);
+                        const word = wordData.word;
+                        
+                        if (word) {
+                            wordDatabase[word.toLowerCase()] = {
+                                phonetic: "",
+                                definition: wordData.translation || wordData.definition || "",
+                                tags: []
+                            };
+                            successCount++;
+                        }
+                    } catch (parseError) {
+                        errorCount++;
+                        if (errorCount <= 5) { // 只显示前5个错误
+                            addResult(`第${i + 1}行解析失败: ${parseError.message}`, 'error');
+                        }
+                    }
+                }
+                
+                addResult(`✅ 解析完成！成功: ${successCount} 个单词，失败: ${errorCount} 行`, 'success');
+                addResult(`总单词数: ${Object.keys(wordDatabase).length}`, 'info');
+                
+                // 显示前5个单词作为示例
+                const sampleWords = Object.keys(wordDatabase).slice(0, 5);
+                addResult(`示例单词: ${sampleWords.join(', ')}`, 'info');
+                
+                // 显示第一个单词的详细信息
+                if (sampleWords.length > 0) {
+                    const firstWord = sampleWords[0];
+                    const wordData = wordDatabase[firstWord];
+                    addResult(`"${firstWord}" 的释义: ${wordData.definition}`, 'info');
+                }
+            })
+            .catch(error => {
+                addResult(`❌ 加载失败: ${error.message}`, 'error');
+            });
+    </script>
+</body>
+</html>
